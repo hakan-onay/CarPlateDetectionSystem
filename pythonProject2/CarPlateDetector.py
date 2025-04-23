@@ -1,7 +1,7 @@
 import cv2
 import pytesseract
 
-# Tesseract yolu
+# Tesseract path
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class CarPlateDetector:
