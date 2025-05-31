@@ -1,52 +1,78 @@
 import cv2
 import pytesseract
+import time
+from ultralytics import YOLO
+from PlateCharacterDetector import PlateCharacterDetector
+from VehicleTypeDetector import VehicleTypeDetector
+from DatabaseManager import DatabaseManager
 
-# Tesseract yolu
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class CarPlateDetector:
-    def processImage(self, path):
-        image = cv2.imread(path)
-        if image is None:
-            print("Image doesn't read. Check the path:", path)
-            return
+    def __init__(self, plate_model_path, char_model_path=None, vehicle_model_path=None, conf_threshold=0.75, cooldown=10):
+        self.plate_model = YOLO(plate_model_path)
+        self.char_detector = PlateCharacterDetector(char_model_path) if char_model_path else None
+        self.vehicle_detector = VehicleTypeDetector(vehicle_model_path) if vehicle_model_path else None
+        self.db = DatabaseManager()
+        self.conf_threshold = conf_threshold
+        self.cooldown = cooldown
+        self.last_detected = {}
 
-        # 1. Ön işleme
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, 50, 150)
+    def _should_save_plate(self, plate_text):
+        now = time.time()
+        if plate_text in self.last_detected and now - self.last_detected[plate_text] < self.cooldown:
+            return False
+        self.last_detected[plate_text] = now
+        return True
 
-        # 2. Kontur bulma
-        contours, _ = cv2.findContours(edges.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)
+    def detect_plate(self, image):
+        plate_results = self.plate_model(image)
+        vehicle_info = self.vehicle_detector.detect_vehicle(image) if self.vehicle_detector else []
 
-        plate_contour = None
-        for contour in contours:
-            approx = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
-            if len(approx) == 4:
-                plate_contour = approx
-                break
+        plates = []
 
-        if plate_contour is not None:
-            # 3. Dikdörtgeni çiz (doğru evrede burasıdır!)
-            cv2.drawContours(image, [plate_contour], -1, (0, 255, 0), 3)
+        for result in plate_results:
+            for box in result.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                conf = float(box.conf[0])
 
-            # 4. Plaka bölgesini kırp (sadece o alanı al OCR için)
-            x, y, w, h = cv2.boundingRect(plate_contour)
-            plate_roi = gray[y:y+h, x:x+w]
+                if conf < self.conf_threshold:
+                    continue
 
-            # 5. OCR
-            text = pytesseract.image_to_string(plate_roi, config='--psm 8')
-            print("Detected Plate Number:", text)
+                roi = image[y1:y2, x1:x2]
+                text = self.char_detector.detect_characters(roi) if self.char_detector else ""
 
-            # 6. Plaka bölgesini de göster
-            cv2.imshow("Detected Plate ROI", plate_roi)
-        else:
-            print("No plate-like contour found.")
+                if text and self._should_save_plate(text):
+                    print(f"[NEW] Detected plate: {text}")
+                    owner = self.db.get_owner(text)
 
-        # 7. Görselleri göster
-        cv2.imshow("Original with Rectangle", image)
-        cv2.imshow("Blurred", blurred)
-        cv2.imshow("Edges", edges)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+                    if not owner:
+                        owner = input(f"Owner for plate '{text}' not found. Please enter owner's name: ")
+                        self.db.insert_plate(text, owner)
+
+                    else:
+                        print(f"[INFO] Plate '{text}' already exists. Owner: {owner}")
+
+                    vehicle_type = self._match_vehicle_type((x1, y1, x2, y2), vehicle_info)
+
+                    plates.append({
+                        'bbox': (x1, y1, x2, y2),
+                        'confidence': conf,
+                        'text': text,
+                        'roi': roi,
+                        'owner': owner,
+                        'vehicle': vehicle_type
+                    })
+
+                else:
+                    print(f"[SKIPPED] Plate {text or '[empty]'} duplicated or low confidence")
+
+        return plates
+
+    def _match_vehicle_type(self, plate_bbox, vehicle_info):
+        px1, py1, px2, py2 = plate_bbox
+        for vehicle in vehicle_info:
+            vx1, vy1, vx2, vy2 = vehicle['bbox']
+            if vx1 <= px1 <= vx2 and vy1 <= py1 <= vy2:
+                return vehicle['label']
+        return "Unknown"
