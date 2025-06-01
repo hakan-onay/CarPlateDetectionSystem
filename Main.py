@@ -1,16 +1,23 @@
-from AnalyzeImage import analyze_image
 from CarPlateDetector import CarPlateDetector
-from VehicleTypeDetector import VehicleTypeDetector
+from AnalyzeInput import analyze_input
 
 if __name__ == "__main__":
+    # Path to the input image or video
+    input_path = "C:/Users/Hakan/Desktop/car.jpg"
 
-    image_path = "C:/Users/Hakan/Desktop/siyah-plaka.jpg"
-    plate_model_path = "C:/Users/Hakan/runs/detect/train17/weights/best.pt"
-    vehicle_model_path = "C:/Users/Hakan/runs/detect/train19/weights/best.pt"
+    # Paths to trained YOLO models for plate characters and vehicle type
+    plate_model_path = "C:/Users/Hakan/Desktop/PlateModel/weights/best.pt"
+    char_model_path = "C:/Users/Hakan/Desktop/CharModel/weights/best.pt"
+    vehicle_model_path = "C:/Users/Hakan/Desktop/VehicleModel/weights/best.pt"
 
+    # Initialize the car plate detector
+    detector = CarPlateDetector(
+        plate_model_path=plate_model_path,
+        char_model_path=char_model_path,
+        vehicle_model_path=vehicle_model_path,
+        conf_threshold=0.75,
+        cooldown=10  # seconds to ignore duplicate detections
+    )
 
-    plate_detector = CarPlateDetector(plate_model_path)
-    vehicle_detector = VehicleTypeDetector(vehicle_model_path)
-
-
-    analyze_image(image_path, plate_detector, vehicle_detector)
+    # Analyze the given input
+    analyze_input(input_path, detector)
