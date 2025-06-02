@@ -5,7 +5,6 @@ class VehicleTypeDetector:
         self.model = YOLO(model_path)
 
     def detect_vehicle(self, image):
-        # Run YOLO to detect vehicle type
         results = self.model(image)
         vehicles = []
 
