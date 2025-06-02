@@ -1,9 +1,11 @@
 from ultralytics import YOLO
+
 class VehicleTypeDetector:
     def __init__(self, model_path):
         self.model = YOLO(model_path)
 
     def detect_vehicle(self, image):
+        # Run YOLO to detect vehicle type
         results = self.model(image)
         vehicles = []
 
@@ -19,5 +21,5 @@ class VehicleTypeDetector:
                     'confidence': conf,
                     'label': label
                 })
-        return vehicles
 
+        return vehicles
