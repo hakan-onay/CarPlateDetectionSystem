@@ -4,7 +4,7 @@ import cv2
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QStackedWidget, QLineEdit, QTextEdit, QFileDialog,
                              QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog)
-from PyQt5.QtGui import QPixmap, QImage, QIcon, QColor
+from PyQt5.QtGui import QPixmap, QImage, QIcon, QColor, QDoubleValidator, QIntValidator
 from PyQt5.QtCore import Qt, QTimer
 from CarPlateDetector import CarPlateDetector
 from DatabaseManager import DatabaseManager
@@ -17,10 +17,14 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 1000, 700)
 
         # Model paths
-        self.plate_model_path = "C:/Users/Hakan/PycharmProjects/CarPlateDetection/models/PlateModel/weights/best.pt"
-        self.char_model_path = "C:/Users/Hakan/PycharmProjects/CarPlateDetection/models/CharModel/weights/best.pt"
-        self.vehicle_model_path = "C:/Users/Hakan/PycharmProjects/CarPlateDetection/models/VehicleModel/weights/best.pt"
-        self.db_path = "C:/Users/Hakan/PycharmProjects/CarPlateDetection/LPR.db"
+        self.plate_model_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/models/PlateModel/weights/best.pt"
+        self.char_model_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/models/CharModel/weights/best.pt"
+        self.vehicle_model_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/models/VehicleModel/weights/best.pt"
+        self.db_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/LPR.db"
+
+        # Detection parameters
+        self.conf_threshold = 0.75
+        self.cooldown = 10
 
         # Initialize detector and database
         self.detector = None
@@ -351,6 +355,17 @@ class MainWindow(QMainWindow):
         self.db_path_edit = QLineEdit(self.db_path)
         layout.addWidget(self.db_path_edit)
 
+        # Detection parameters
+        layout.addWidget(QLabel("Confidence Threshold (0.1-1.0):"))
+        self.threshold_edit = QLineEdit(str(self.conf_threshold))
+        self.threshold_edit.setValidator(QDoubleValidator(0.1, 1.0, 2))
+        layout.addWidget(self.threshold_edit)
+
+        layout.addWidget(QLabel("Cooldown Time (seconds):"))
+        self.cooldown_edit = QLineEdit(str(self.cooldown))
+        self.cooldown_edit.setValidator(QIntValidator(1, 60))
+        layout.addWidget(self.cooldown_edit)
+
         # Save button
         self.btn_save = QPushButton("Save Settings")
         self.btn_save.setStyleSheet("padding: 10px; font-size: 16px;")
@@ -498,7 +513,7 @@ class MainWindow(QMainWindow):
                     result_text = f"Plate: {text}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\n\n"
                     self.image_results.insertPlainText(result_text)
 
-                    # Save to database if not exists - This is where we need to ensure owner is prompted
+                    # Save to database if not exists
                     owner, existing_vehicle = self.db.get_owner(plate['text'])
                     if owner is None:
                         # Prompt for owner information
@@ -583,9 +598,9 @@ class MainWindow(QMainWindow):
         cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM Plates 
-            WHERE plate LIKE ? OR owner LIKE ? OR vehicle_type LIKE ?
+            WHERE plate LIKE ? OR owner LIKE ? OR vehicle_type LIKE ? OR date_time LIKE ?
             ORDER BY id DESC
-        """, (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"))
+        """, (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"))
         data = cursor.fetchall()
         conn.close()
 
@@ -593,7 +608,6 @@ class MainWindow(QMainWindow):
         for row_idx, row_data in enumerate(data):
             for col_idx, col_data in enumerate(row_data):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(col_data)))
-
     def add_plate(self):
         """Add new plate to database"""
         plate, ok1 = QInputDialog.getText(self, "Add Plate", "Enter plate number:")
@@ -640,7 +654,26 @@ class MainWindow(QMainWindow):
         self.vehicle_model_path = self.vehicle_path_edit.text()
         self.db_path = self.db_path_edit.text()
 
-        # Reinitialize detector with new paths
+        # Get threshold and cooldown values
+        try:
+            self.conf_threshold = float(self.threshold_edit.text())
+            if self.conf_threshold < 0.1 or self.conf_threshold > 1.0:
+                raise ValueError("Threshold must be between 0.1 and 1.0")
+        except ValueError as e:
+            self.settings_status.setText(f"Invalid threshold: {str(e)}")
+            self.settings_status.setStyleSheet("color: red;")
+            return
+
+        try:
+            self.cooldown = int(self.cooldown_edit.text())
+            if self.cooldown < 1 or self.cooldown > 60:
+                raise ValueError("Cooldown must be between 1 and 60 seconds")
+        except ValueError as e:
+            self.settings_status.setText(f"Invalid cooldown: {str(e)}")
+            self.settings_status.setStyleSheet("color: red;")
+            return
+
+        # Reinitialize detector with new settings
         self.initialize_detector()
 
         # Update database connection
@@ -656,8 +689,8 @@ class MainWindow(QMainWindow):
                 plate_model_path=self.plate_model_path,
                 char_model_path=self.char_model_path,
                 vehicle_model_path=self.vehicle_model_path,
-                conf_threshold=0.75,
-                cooldown=10
+                conf_threshold=self.conf_threshold,
+                cooldown=self.cooldown
             )
             # Set the parent window for showing dialogs
             self.detector.set_parent_window(self)
