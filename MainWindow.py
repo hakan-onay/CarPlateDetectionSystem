@@ -17,10 +17,10 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 1000, 700)
 
         # Model paths
-        self.plate_model_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/models/PlateModel/weights/best.pt"
-        self.char_model_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/models/CharModel/weights/best.pt"
-        self.vehicle_model_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/models/VehicleModel/weights/best.pt"
-        self.db_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/LPR.db"
+        self.plate_model_path = "C:/Users/Hakan/PycharmProjects/CarPlateDetection/models/PlateModel/weights/best.pt"
+        self.char_model_path = "C:/Users/Hakan/PycharmProjects/CarPlateDetection/models/CharModel/weights/best.pt"
+        self.vehicle_model_path = "C:/Users/Hakan/PycharmProjects/CarPlateDetection/models/VehicleModel/weights/best.pt"
+        self.db_path = "C:/Users/Hakan/PycharmProjects/CarPlateDetection/LPR.db"
 
         # Detection parameters
         self.conf_threshold = 0.75
@@ -456,11 +456,14 @@ class MainWindow(QMainWindow):
                     # Draw bounding boxes and text
                     x1, y1, x2, y2 = plate['bbox']
                     cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    text = f"{plate['text']} ({plate['vehicle']})"
+
+                    # Format confidence as percentage
+                    confidence_percent = plate['confidence'] * 100
+                    text = f"{plate['text']} ({plate['vehicle']}) - {confidence_percent:.1f}%"
                     cv2.putText(rgb_image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
                     # Update results display
-                    result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\n\n"
+                    result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n"
                     self.detection_results.append(result_text)
 
                 # Display the frame
@@ -505,12 +508,13 @@ class MainWindow(QMainWindow):
                     x1, y1, x2, y2 = plate['bbox']
                     cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-                    # Display plate text
-                    text = plate['text']
+                    # Format confidence as percentage
+                    confidence_percent = plate['confidence'] * 100
+                    text = f"{plate['text']} - {confidence_percent:.1f}%"
                     cv2.putText(rgb_image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
                     # Update results
-                    result_text = f"Plate: {text}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\n\n"
+                    result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n"
                     self.image_results.insertPlainText(result_text)
 
                     # Save to database if not exists
@@ -561,7 +565,7 @@ class MainWindow(QMainWindow):
 
             self.btn_play_video.setEnabled(False)
             self.btn_stop_video.setEnabled(True)
-            self.timer.start(30)
+            self.timer.start(30)  # Same as camera update rate
 
     def stop_video(self):
         """Stop video playback"""
