@@ -1,7 +1,7 @@
 task: detect
 mode: train
 model: yolov8n.pt
-data: C:\Users\Casper\Desktop\dataset\data.yaml
+data: C:\Users\Hakan\Desktop\all_char_recognition_new.v1i.yolov8\data.yaml
 epochs: 50
 time: null
 patience: 100
@@ -10,10 +10,10 @@ imgsz: 640
 save: true
 save_period: -1
 cache: false
-device: cuda
+device: '0'
 workers: 8
 project: null
-name: train3
+name: train2
 exist_ok: false
 pretrained: true
 optimizer: auto
@@ -95,10 +95,11 @@ fliplr: 0.5
 bgr: 0.0
 mosaic: 1.0
 mixup: 0.0
+cutmix: 0.0
 copy_paste: 0.0
 copy_paste_mode: flip
 auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: botsort.yaml
-save_dir: C:\Users\Casper\PycharmProjects\runs\detect\train3
+save_dir: C:\Users\Hakan\PycharmProjects\CarPlateDetection\runs\detect\train2
