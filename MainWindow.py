@@ -17,10 +17,10 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 1000, 700)
 
         # Model paths
-        self.plate_model_path = "models/PlateModel/weights/best.pt"
-        self.char_model_path = "models/CharModel/weights/best.pt"
-        self.vehicle_model_path = "models/VehicleModel/weights/best.pt"
-        self.db_path = "LPR.db"
+        self.plate_model_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/models/PlateModel/weights/best.pt"
+        self.char_model_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/models/CharModel/weights/best.pt"
+        self.vehicle_model_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/models/VehicleModel/weights/best.pt"
+        self.db_path = "C:/Users/Casper/PycharmProjects/CarPlateDetectionSystem/LPR.db"
 
         # Detection parameters
         self.conf_threshold = 0.75
@@ -443,60 +443,41 @@ class MainWindow(QMainWindow):
         self.video_label.clear()
 
     def update_frame(self):
-        """Update camera or video frame with detection results"""
+        """Update camera frame with detection results"""
         try:
             ret, frame = self.cap.read()
-            if not ret:
-                # Video sona erdiyse
-                if hasattr(self, 'current_video_path'):
-                    self.stop_video()
-                return
+            if ret:
+                rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # Detect plates
+                plates = self.detector.detect_plate(frame)
 
-            # Detect plates
-            plates = self.detector.detect_plate(frame)
+                for plate in plates:
+                    # Draw bounding boxes and text
+                    x1, y1, x2, y2 = plate['bbox']
+                    cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-            for plate in plates:
-                # Draw bounding boxes and text
-                x1, y1, x2, y2 = plate['bbox']
-                cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    # Format confidence as percentage
+                    confidence_percent = plate['confidence'] * 100
+                    text = f"{plate['text']} ({plate['vehicle']}) - {confidence_percent:.1f}%"
+                    cv2.putText(rgb_image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
-                # Format confidence as percentage
-                confidence_percent = plate['confidence'] * 100
-                text = f"{plate['text']} ({plate['vehicle']}) - {confidence_percent:.1f}%"
-                cv2.putText(rgb_image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-
-                # Update results display
-                result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n"
-
-                # Hangi modda olduğumuza göre sonuçları farklı yere yaz
-                if hasattr(self, 'current_video_path'):  # Video modu
-                    self.video_results.append(result_text)
-                else:  # Real-time modu
+                    # Update results display
+                    result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n"
                     self.detection_results.append(result_text)
 
-            # Display the frame in the correct label
-            h, w, ch = rgb_image.shape
-            bytes_per_line = ch * w
-            qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
-            pixmap = QPixmap.fromImage(qt_image)
-
-            # Hangi modda olduğumuza göre farklı QLabel'da göster
-            if hasattr(self, 'current_video_path'):  # Video modu
-                self.video_file_label.setPixmap(
-                    pixmap.scaled(self.video_file_label.width(), self.video_file_label.height(), Qt.KeepAspectRatio))
-            else:  # Real-time modu
+                # Display the frame
+                h, w, ch = rgb_image.shape
+                bytes_per_line = ch * w
+                qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(qt_image)
                 self.video_label.setPixmap(
                     pixmap.scaled(self.video_label.width(), self.video_label.height(), Qt.KeepAspectRatio))
 
         except Exception as e:
             print(f"Frame update error: {e}")
-            if hasattr(self, 'current_video_path'):
-                self.stop_video()
-            else:
-                self.stop_camera()
-            QMessageBox.critical(self, "Error", f"Error: {str(e)}")
+            self.stop_camera()
+            QMessageBox.critical(self, "Error", f"Camera error: {str(e)}")
 
     # Image functions
     def load_image(self):
@@ -576,23 +557,15 @@ class MainWindow(QMainWindow):
         if not self.detector:
             self.initialize_detector()
 
-        # Eğer kamera çalışıyorsa kapat
-        if self.cap and not hasattr(self, 'current_video_path'):
-            self.stop_camera()
+        if hasattr(self, 'current_video_path'):
+            self.cap = cv2.VideoCapture(self.current_video_path)
+            if not self.cap.isOpened():
+                QMessageBox.critical(self, "Error", "Could not open video file!")
+                return
 
-        # Check if we already have a video path loaded
-        if not hasattr(self, 'current_video_path'):
-            QMessageBox.warning(self, "Warning", "Please load a video first!")
-            return
-
-        self.cap = cv2.VideoCapture(self.current_video_path)
-        if not self.cap.isOpened():
-            QMessageBox.critical(self, "Error", "Could not open video file!")
-            return
-
-        self.btn_play_video.setEnabled(False)
-        self.btn_stop_video.setEnabled(True)
-        self.timer.start(30)  # Same as camera update rate
+            self.btn_play_video.setEnabled(False)
+            self.btn_stop_video.setEnabled(True)
+            self.timer.start(30)  # Same as camera update rate
 
     def stop_video(self):
         """Stop video playback"""
@@ -601,13 +574,9 @@ class MainWindow(QMainWindow):
             self.cap.release()
             self.cap = None
 
-        if hasattr(self, 'current_video_path'):
-            del self.current_video_path  # Video modundan çıkıyoruz
-
         self.btn_play_video.setEnabled(True)
         self.btn_stop_video.setEnabled(False)
         self.video_file_label.clear()
-        self.video_results.clear()
 
     def load_database(self):
         """Load all plates from database"""

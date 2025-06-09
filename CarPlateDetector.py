@@ -1,19 +1,20 @@
 import time
-
 from PyQt5.QtWidgets import QInputDialog, QLineEdit, QMessageBox
 from ultralytics import YOLO
 from PlateCharacterDetector import PlateCharacterDetector
 from VehicleTypeDetector import VehicleTypeDetector
 from DatabaseManager import DatabaseManager
 
+
 class CarPlateDetector:
-    def __init__(self, plate_model_path, char_model_path=None, vehicle_model_path=None, conf_threshold=0.75, cooldown=10):
+    def __init__(self, plate_model_path, char_model_path=None, vehicle_model_path=None, conf_threshold=0.75,
+                 cooldown=10):
         # Load YOLOv8 models
         self.plate_model = YOLO(plate_model_path)
         self.char_detector = PlateCharacterDetector(char_model_path) if char_model_path else None
         self.vehicle_detector = VehicleTypeDetector(vehicle_model_path) if vehicle_model_path else None
         self.db = DatabaseManager()
-        self.conf_threshold = conf_threshold
+        self.conf_threshold = conf_threshold  # Only for plate model
         self.cooldown = cooldown
         self.last_detected = {}  # To avoid duplicates in short intervals
         self.parent_window = None  # Will be set by MainWindow
@@ -33,28 +34,36 @@ class CarPlateDetector:
     def detect_plate(self, image):
         plates = []
         try:
-            # Run plate detection model
-            plate_results = self.plate_model(image)
-            vehicle_info = self.vehicle_detector.detect_vehicle(image) if self.vehicle_detector else []
+            # STEP 1: Run plate detection model with our confidence threshold
+            plate_results = self.plate_model(image, conf=self.conf_threshold)
+
+            # STEP 2: If vehicle detector exists, run it on the whole image
+            vehicle_info = []
+            if self.vehicle_detector:
+                vehicle_info = self.vehicle_detector.detect_vehicle(image)
 
             for result in plate_results:
                 for box in result.boxes:
+                    # Get plate bounding box
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                     conf = float(box.conf[0])
 
-                    if conf < self.conf_threshold:
-                        continue
-
                     # Crop the detected plate
-                    roi = image[y1:y2, x1:x2]
+                    plate_roi = image[y1:y2, x1:x2]
 
-                    # Run character recognition
-                    text = self.char_detector.detect_characters(roi) if self.char_detector else ""
+                    # STEP 3: Run character recognition on the plate ROI (no threshold check)
+                    text = ""
+                    if self.char_detector:
+                        text = self.char_detector.detect_characters(plate_roi)
+                        if not text:  # If no text detected, skip this plate
+                            continue
 
                     if text and self._should_save_plate(text):
+                        # STEP 4: Find matching vehicle type for this plate
+                        vehicle_type = self._match_vehicle_type((x1, y1, x2, y2), vehicle_info)
+
                         # Get or create owner information
                         owner, vehicle_type_db = self.db.get_owner(text)
-                        vehicle_type = self._match_vehicle_type((x1, y1, x2, y2), vehicle_info)
 
                         # If plate not in database, prompt for owner info
                         if owner is None and self.parent_window:
@@ -78,7 +87,7 @@ class CarPlateDetector:
                             'bbox': (x1, y1, x2, y2),
                             'confidence': conf,
                             'text': text,
-                            'roi': roi,
+                            'roi': plate_roi,
                             'owner': owner or "Unknown",
                             'vehicle': vehicle_type or "Unknown"
                         })
@@ -91,10 +100,29 @@ class CarPlateDetector:
         return plates
 
     def _match_vehicle_type(self, plate_bbox, vehicle_info):
-        # Check if plate is inside a vehicle bounding box
+        """Find the vehicle that contains this plate"""
+        if not vehicle_info:
+            return "Unknown"
+
         px1, py1, px2, py2 = plate_bbox
+        plate_center = ((px1 + px2) // 2, (py1 + py2) // 2)
+
+        best_match = None
+        best_area = 0
+
         for vehicle in vehicle_info:
             vx1, vy1, vx2, vy2 = vehicle['bbox']
-            if vx1 <= px1 <= vx2 and vy1 <= py1 <= vy2:
-                return vehicle['label']
-        return "Unknown"
+
+            # Check if plate center is inside vehicle bbox
+            if (vx1 <= plate_center[0] <= vx2 and
+                    vy1 <= plate_center[1] <= vy2):
+
+                # Calculate area of vehicle
+                area = (vx2 - vx1) * (vy2 - vy1)
+
+                # Choose the largest containing vehicle
+                if area > best_area:
+                    best_area = area
+                    best_match = vehicle['label']
+
+        return best_match if best_match else "Unknown"
