@@ -26,7 +26,7 @@ class PlateCharacterDetector:
         # Sort characters by their x-coordinate left to right
         characters.sort(key=lambda x: x[0])
 
-        # Concatenate characters to form the plate text
+        # Bound characters to form the plate text
         plate_text = ''.join(label for _, label in characters)
 
         # Remove any non-alphanumeric characters

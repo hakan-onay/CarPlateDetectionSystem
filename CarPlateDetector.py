@@ -43,15 +43,15 @@ class CarPlateDetector:
         plates = []  # List to store detected plates and their info
 
         try:
-            # STEP 1: Detect license plates using YOLO with the confidence threshold
+            #  1: Detect license plates using YOLO with the confidence threshold
             plate_results = self.plate_model(image, conf=self.conf_threshold)
 
-            # STEP 2: Detect vehicles in the whole image if vehicle detector is available
+            #  2: Detect vehicles in the whole image if vehicle detector is available
             vehicle_info = []
             if self.vehicle_detector:
                 vehicle_info = self.vehicle_detector.detect_vehicle(image)
 
-            # STEP 3: Process each detection result
+            # 3: Process each detection result
             for result in plate_results:
                 for box in result.boxes:
                     x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box for plate
@@ -60,7 +60,7 @@ class CarPlateDetector:
                     # Crop the license plate from the image
                     plate_roi = image[y1:y2, x1:x2]
 
-                    # STEP 4: Perform character recognition
+                    #  4: Perform character recognition
                     text = ""
                     if self.char_detector:
                         text = self.char_detector.detect_characters(plate_roi)
@@ -69,13 +69,13 @@ class CarPlateDetector:
 
                     # Check for duplicate detection and decide whether to save
                     if text and self._should_save_plate(text):
-                        # STEP 5: Match the detected plate to a vehicle type
+                        #  5: Match the detected plate to a vehicle type
                         vehicle_type = self._match_vehicle_type((x1, y1, x2, y2), vehicle_info)
 
-                        # STEP 6: Get owner info from database
+                        #  6: Get owner info from database
                         owner, vehicle_type_db = self.db.get_owner(text)
 
-                        # STEP 7: If not in DB, ask user for owner name
+                        #  7: If not in DB, ask user for owner name
                         if owner is None and self.parent_window:
                             owner, ok = QInputDialog.getText(
                                 self.parent_window,
@@ -111,7 +111,7 @@ class CarPlateDetector:
         return plates  # Return list of plate dictionaries
 
     def _match_vehicle_type(self, plate_bbox, vehicle_info):
-        """Try to associate the plate with a vehicle by checking bounding box overlap."""
+
         if not vehicle_info:
             return "Unknown"
 

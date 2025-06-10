@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.update_frame)
 
     def create_navigation(self):
-        """Create the navigation sidebar"""
+        #Create the navigation sidebar
         self.navigation = QWidget()
         self.navigation.setStyleSheet("""
             background-color: #2c3e50;
@@ -114,7 +114,7 @@ class MainWindow(QMainWindow):
         self.navigation.setLayout(layout)
 
     def create_pages(self):
-        """Create all application pages"""
+        #Create all application pages
         self.stacked_widget = QStackedWidget()
 
         # Page 0: Real-time Detection
@@ -138,7 +138,7 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.page_settings)
 
     def create_detection_page(self):
-        """Create real-time detection page"""
+        #Create real-time detection page
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -181,7 +181,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_image_page(self):
-        """Create image detection page"""
+        #Create image detection page
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -221,7 +221,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_video_page(self):
-        """Create video detection page"""
+        #Create video detection page
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -267,7 +267,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_database_page(self):
-        """Create database management page"""
+        #Create database management page
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -328,7 +328,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_settings_page(self):
-        """Create settings page"""
+        #Create settings page
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -381,7 +381,7 @@ class MainWindow(QMainWindow):
         return page
 
     def switch_page(self, index):
-        """Switch between pages"""
+        #Switch between pages
         self.stacked_widget.setCurrentIndex(index)
 
         # Reset navigation buttons
@@ -418,7 +418,7 @@ class MainWindow(QMainWindow):
 
     # Camera functions
     def start_camera(self):
-        """Start camera for real-time detection"""
+        #Start camera for real-time detection
         if not self.detector:
             self.initialize_detector()
 
@@ -432,7 +432,7 @@ class MainWindow(QMainWindow):
         self.timer.start(30)  # Update every 30ms
 
     def stop_camera(self):
-        """Stop camera"""
+        #Stop camera
         self.timer.stop()
         if self.cap:
             self.cap.release()
@@ -443,11 +443,11 @@ class MainWindow(QMainWindow):
         self.video_label.clear()
 
     def update_frame(self):
-        """Update camera or video frame with detection results"""
+        #Update camera or video frame with detection results
         try:
             ret, frame = self.cap.read()
             if not ret:
-                # Video sona erdiyse
+                # if video ends
                 if hasattr(self, 'current_video_path'):
                     self.stop_video()
                 return
@@ -470,10 +470,10 @@ class MainWindow(QMainWindow):
                 # Update results display
                 result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n"
 
-                # Hangi modda olduğumuza göre sonuçları farklı yere yaz
-                if hasattr(self, 'current_video_path'):  # Video modu
+                # write results according to mode
+                if hasattr(self, 'current_video_path'):  # Video
                     self.video_results.append(result_text)
-                else:  # Real-time modu
+                else:  # Real-time
                     self.detection_results.append(result_text)
 
             # Display the frame in the correct label
@@ -482,11 +482,11 @@ class MainWindow(QMainWindow):
             qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
             pixmap = QPixmap.fromImage(qt_image)
 
-            # Hangi modda olduğumuza göre farklı QLabel'da göster
-            if hasattr(self, 'current_video_path'):  # Video modu
+            # Show different QLabel depending on which mode we are in
+            if hasattr(self, 'current_video_path'):  # Video mod
                 self.video_file_label.setPixmap(
                     pixmap.scaled(self.video_file_label.width(), self.video_file_label.height(), Qt.KeepAspectRatio))
-            else:  # Real-time modu
+            else:  # Real-time mod
                 self.video_label.setPixmap(
                     pixmap.scaled(self.video_label.width(), self.video_label.height(), Qt.KeepAspectRatio))
 
@@ -500,7 +500,7 @@ class MainWindow(QMainWindow):
 
     # Image functions
     def load_image(self):
-        """Load image from file"""
+
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp)")
         if file_path:
             self.current_image_path = file_path
@@ -510,7 +510,7 @@ class MainWindow(QMainWindow):
             self.btn_detect_image.setEnabled(True)
 
     def detect_image(self):
-        """Detect plates in loaded image"""
+        #Detect plates in loaded image
         if not self.detector:
             self.initialize_detector()
 
@@ -564,7 +564,7 @@ class MainWindow(QMainWindow):
 
     # Video functions
     def load_video(self):
-        """Load video from file"""
+
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Video", "", "Video Files (*.mp4 *.avi *.mov *.mkv)")
         if file_path:
             self.current_video_path = file_path
@@ -572,11 +572,11 @@ class MainWindow(QMainWindow):
             self.video_file_label.setText(f"Video loaded: {file_path}")
 
     def play_video(self):
-        """Play loaded video with detection"""
+
         if not self.detector:
             self.initialize_detector()
 
-        # Eğer kamera çalışıyorsa kapat
+        # if camera works  close
         if self.cap and not hasattr(self, 'current_video_path'):
             self.stop_camera()
 
@@ -595,14 +595,14 @@ class MainWindow(QMainWindow):
         self.timer.start(30)  # Same as camera update rate
 
     def stop_video(self):
-        """Stop video playback"""
+
         self.timer.stop()
         if self.cap:
             self.cap.release()
             self.cap = None
 
         if hasattr(self, 'current_video_path'):
-            del self.current_video_path  # Video modundan çıkıyoruz
+            del self.current_video_path  # Exit video mode
 
         self.btn_play_video.setEnabled(True)
         self.btn_stop_video.setEnabled(False)
@@ -610,7 +610,7 @@ class MainWindow(QMainWindow):
         self.video_results.clear()
 
     def load_database(self):
-        """Load all plates from database"""
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM Plates ORDER BY id DESC")
@@ -623,7 +623,7 @@ class MainWindow(QMainWindow):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(col_data)))
 
     def search_database(self):
-        """Search plates in database"""
+
         search_term = self.search_input.text().strip()
         if not search_term:
             self.load_database()
@@ -644,7 +644,7 @@ class MainWindow(QMainWindow):
             for col_idx, col_data in enumerate(row_data):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(col_data)))
     def add_plate(self):
-        """Add new plate to database"""
+        #Add new plate to database
         plate, ok1 = QInputDialog.getText(self, "Add Plate", "Enter plate number:")
         if ok1 and plate:
             owner, ok2 = QInputDialog.getText(self, "Add Owner", "Enter owner name:")
@@ -659,7 +659,7 @@ class MainWindow(QMainWindow):
                         QMessageBox.warning(self, "Error", "Plate already exists in database!")
 
     def remove_plate(self):
-        """Remove selected plate from database"""
+        #Remove selected plate from database
         selected_row = self.table.currentRow()
         if selected_row >= 0:
             plate_id = self.table.item(selected_row, 0).text()
@@ -683,7 +683,7 @@ class MainWindow(QMainWindow):
 
     # Settings functions
     def save_settings(self):
-        """Save settings from settings page"""
+
         self.plate_model_path = self.plate_path_edit.text()
         self.char_model_path = self.char_path_edit.text()
         self.vehicle_model_path = self.vehicle_path_edit.text()
@@ -718,7 +718,7 @@ class MainWindow(QMainWindow):
         self.settings_status.setStyleSheet("color: green;")
 
     def initialize_detector(self):
-        """Initialize the plate detector with current settings"""
+        #Initialize the plate detector with current settings
         try:
             self.detector = CarPlateDetector(
                 plate_model_path=self.plate_model_path,
@@ -734,7 +734,7 @@ class MainWindow(QMainWindow):
             self.detector = None
 
     def closeEvent(self, event):
-        """Clean up resources when closing the application"""
+
         self.stop_camera()
         self.stop_video()
         event.accept()

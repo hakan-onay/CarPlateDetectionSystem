@@ -27,7 +27,7 @@ class DatabaseManager:
         conn.close()
 
     def insert_plate(self, plate_text, owner, vehicle_type=None):
-        """Insert new plate with proper error handling"""
+
         try:
             conn = self._connect()
             cursor = conn.cursor()
@@ -57,7 +57,7 @@ class DatabaseManager:
             conn.close()
 
     def get_owner(self, plate_text):
-        """Get owner info with better error handling"""
+
         try:
             conn = self._connect()
             cursor = conn.cursor()
