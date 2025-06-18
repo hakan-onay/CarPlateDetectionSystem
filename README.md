@@ -45,7 +45,7 @@ A real-time, multi-functional License Plate Recognition system powered by YOLOv8
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/license-plate-recognition.git
+git clone https://github.com/hakan-onay/license-plate-recognition.git
 cd license-plate-recognition
 
 # Create virtual environment
