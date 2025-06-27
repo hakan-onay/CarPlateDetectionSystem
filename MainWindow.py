@@ -2,6 +2,7 @@ import sys
 import cv2
 import sqlite3
 import qrcode
+import pandas as pd
 from pyzbar.pyzbar import decode
 import webbrowser
 from datetime import datetime
@@ -53,7 +54,7 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.update_frame)
 
     def create_navigation(self):
-        """Create the navigation sidebar"""
+        # Create the navigation sidebar
         self.navigation = QWidget()
         self.navigation.setStyleSheet("""
             background-color: #2c3e50;
@@ -119,31 +120,31 @@ class MainWindow(QMainWindow):
         self.navigation.setLayout(layout)
 
     def create_pages(self):
-        """Create all application pages"""
+        # Create all application pages
         self.stacked_widget = QStackedWidget()
 
-        # Page 0: Real-time Detection
+        # Page 1: Real-time Detection
         self.page_detection = self.create_detection_page()
         self.stacked_widget.addWidget(self.page_detection)
 
-        # Page 1: Image Detection
+        # Page 2: Image Detection
         self.page_image = self.create_image_page()
         self.stacked_widget.addWidget(self.page_image)
 
-        # Page 2: Video Detection
+        # Page 3: Video Detection
         self.page_video = self.create_video_page()
         self.stacked_widget.addWidget(self.page_video)
 
-        # Page 3: Database
+        # Page 4: Database
         self.page_database = self.create_database_page()
         self.stacked_widget.addWidget(self.page_database)
 
-        # Page 4: Settings
+        # Page 5: Settings
         self.page_settings = self.create_settings_page()
         self.stacked_widget.addWidget(self.page_settings)
 
     def create_detection_page(self):
-        """Create real-time detection page"""
+        # Create real-time detection page
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -186,7 +187,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_image_page(self):
-        """Create image detection page"""
+        # Create image detection page
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -226,7 +227,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_video_page(self):
-        """Create video detection page"""
+        # Create video detection page
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -272,7 +273,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_database_page(self):
-        """Create database management page with QR code functionality"""
+        # Create database management page with QR code functionality
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -321,7 +322,11 @@ class MainWindow(QMainWindow):
         self.btn_remove.setStyleSheet("padding: 8px; font-size: 14px;")
         self.btn_remove.clicked.connect(self.remove_plate)
 
-        # QR Code buttons
+        self.btn_export_csv = QPushButton("Export to CSV")
+        self.btn_export_csv.setStyleSheet("padding: 8px; font-size: 14px;")
+        self.btn_export_csv.clicked.connect(self.export_to_csv)
+
+
         self.btn_generate_qr = QPushButton("Generate QR")
         self.btn_generate_qr.setStyleSheet("padding: 8px; font-size: 14px;")
         self.btn_generate_qr.clicked.connect(self.generate_qr_code)
@@ -335,6 +340,7 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(self.btn_remove)
         btn_layout.addWidget(self.btn_generate_qr)
         btn_layout.addWidget(self.btn_scan_qr)
+        btn_layout.addWidget(self.btn_export_csv)
         layout.addLayout(btn_layout)
 
         # Load initial data
@@ -344,7 +350,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_settings_page(self):
-        """Create settings page"""
+        # Create settings page
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -397,7 +403,7 @@ class MainWindow(QMainWindow):
         return page
 
     def switch_page(self, index):
-        """Switch between pages"""
+        # Switch between pages
         self.stacked_widget.setCurrentIndex(index)
 
         # Reset navigation buttons
@@ -422,7 +428,7 @@ class MainWindow(QMainWindow):
 
     # Camera functions
     def start_camera(self):
-        """Start camera for real-time detection"""
+        # Start camera for real-time detection
         if not self.detector:
             self.initialize_detector()
 
@@ -436,7 +442,7 @@ class MainWindow(QMainWindow):
         self.timer.start(30)  # Update every 30ms
 
     def stop_camera(self):
-        """Stop camera"""
+        # Stop camera
         self.timer.stop()
         if self.cap:
             self.cap.release()
@@ -447,7 +453,7 @@ class MainWindow(QMainWindow):
         self.video_label.clear()
 
     def update_frame(self):
-        """Update camera or video frame with detection results"""
+        # Update camera or video frame with detection results
         try:
             ret, frame = self.cap.read()
             if not ret:
@@ -500,7 +506,7 @@ class MainWindow(QMainWindow):
 
     # Image functions
     def load_image(self):
-        """Load an image for plate detection"""
+        # Load an image for plate detection
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp)")
         if file_path:
             self.current_image_path = file_path
@@ -510,7 +516,7 @@ class MainWindow(QMainWindow):
             self.btn_detect_image.setEnabled(True)
 
     def detect_image(self):
-        """Detect plates in loaded image"""
+        # Detect plates in loaded image
         if not self.detector:
             self.initialize_detector()
 
@@ -561,7 +567,7 @@ class MainWindow(QMainWindow):
 
     # Video functions
     def load_video(self):
-        """Load a video file for plate detection"""
+        # Load a video file for plate detection
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Video", "", "Video Files (*.mp4 *.avi *.mov *.mkv)")
         if file_path:
             self.current_video_path = file_path
@@ -569,7 +575,7 @@ class MainWindow(QMainWindow):
             self.video_file_label.setText(f"Video loaded: {file_path}")
 
     def play_video(self):
-        """Play the loaded video with plate detection"""
+        # Play the loaded video with plate detection
         if not self.detector:
             self.initialize_detector()
 
@@ -590,7 +596,7 @@ class MainWindow(QMainWindow):
         self.timer.start(30)  # Same as camera update rate
 
     def stop_video(self):
-        """Stop video playback"""
+        # Stop video playback
         self.timer.stop()
         if self.cap:
             self.cap.release()
@@ -606,7 +612,7 @@ class MainWindow(QMainWindow):
 
     # Database functions
     def load_database(self):
-        """Load all plates from database into the table"""
+        # Load all plates from database into the table
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM Plates ORDER BY id DESC")
@@ -619,7 +625,7 @@ class MainWindow(QMainWindow):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(col_data)))
 
     def search_database(self):
-        """Search plates in database"""
+        # Search plates in database
         search_term = self.search_input.text().strip()
         if not search_term:
             self.load_database()
@@ -641,7 +647,7 @@ class MainWindow(QMainWindow):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(col_data)))
 
     def add_plate(self):
-        """Add new plate to database"""
+        # Add new plate to database
         plate, ok1 = QInputDialog.getText(self, "Add Plate", "Enter plate number:")
         if ok1 and plate:
             owner, ok2 = QInputDialog.getText(self, "Add Owner", "Enter owner name:")
@@ -656,7 +662,7 @@ class MainWindow(QMainWindow):
                         QMessageBox.warning(self, "Error", "Plate already exists in database!")
 
     def remove_plate(self):
-        """Remove selected plate from database"""
+        # Remove selected plate from database
         selected_row = self.table.currentRow()
         if selected_row >= 0:
             plate_id = self.table.item(selected_row, 0).text()
@@ -680,7 +686,7 @@ class MainWindow(QMainWindow):
 
     # QR Code functions
     def generate_qr_code(self):
-        """Generate QR code for selected plate"""
+        # Generate QR code for selected plate
         selected_row = self.table.currentRow()
         if selected_row >= 0:
             # Get plate information
@@ -713,7 +719,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Warning", "Please select a plate from the table first!")
 
     def scan_qr_code(self):
-        """Scan QR code from image file"""
+        # Scan QR code from image file
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image with QR Code", "",
                                                    "Image Files (*.png *.jpg *.jpeg *.bmp)")
 
@@ -758,7 +764,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Failed to read QR code: {str(e)}")
 
     def generate_shareable_link(self):
-        """Generate a shareable HTML page with vehicle info"""
+        # Generate a shareable HTML page with vehicle info
         selected_row = self.table.currentRow()
         if selected_row >= 0:
             plate_number = self.table.item(selected_row, 1).text()
@@ -788,9 +794,24 @@ class MainWindow(QMainWindow):
                 webbrowser.open(f"file://{file_path}")
                 QMessageBox.information(self, "Success", f"Shareable link saved as {file_path}")
 
+    def export_to_csv(self):
+        try:
+            # Connect to the database and read all data
+            conn = sqlite3.connect(self.db_path)
+            df = pd.read_sql_query("SELECT * FROM Plates", conn)
+            conn.close()
+
+            # Ask user where to save the file
+            file_path, _ = QFileDialog.getSaveFileName(self, "Save as CSV", "plates.csv", "CSV Files (*.csv)")
+            if file_path:
+                df.to_csv(file_path, index=False)
+                QMessageBox.information(self, "Success", "Plate data exported to CSV successfully!")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to export data: {str(e)}")
+
     # Settings functions
     def save_settings(self):
-        """Save application settings"""
+        # Save application settings
         self.plate_model_path = self.plate_path_edit.text()
         self.char_model_path = self.char_path_edit.text()
         self.vehicle_model_path = self.vehicle_path_edit.text()
@@ -825,7 +846,7 @@ class MainWindow(QMainWindow):
         self.settings_status.setStyleSheet("color: green;")
 
     def initialize_detector(self):
-        """Initialize the plate detector with current settings"""
+        # Initialize the plate detector with current settings
         try:
             self.detector = CarPlateDetector(
                 plate_model_path=self.plate_model_path,
@@ -841,7 +862,7 @@ class MainWindow(QMainWindow):
             self.detector = None
 
     def closeEvent(self, event):
-        """Handle application close event"""
+        # Handle application close event
         self.stop_camera()
         self.stop_video()
         event.accept()

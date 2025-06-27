@@ -9,73 +9,91 @@ from DatabaseManager import DatabaseManager
 class CarPlateDetector:
     def __init__(self, plate_model_path, char_model_path=None, vehicle_model_path=None, conf_threshold=0.75,
                  cooldown=10):
-        # Load the YOLOv8
+        # Load YOLOv8 plate detection model
         self.plate_model = YOLO(plate_model_path)
 
-        # load character recognition model
+        # Load character recognition model (optional)
         self.char_detector = PlateCharacterDetector(char_model_path) if char_model_path else None
 
-        # load vehicle type detection model
+        # Load vehicle type classification model (optional)
         self.vehicle_detector = VehicleTypeDetector(vehicle_model_path) if vehicle_model_path else None
 
-        # Initialize database manager for storing-retrieving plate info
+        # Initialize local database manager
         self.db = DatabaseManager()
 
-        self.conf_threshold = conf_threshold  # Minimum confidence
-        self.cooldown = cooldown  # Time limit to avoid duplicate entries
-        self.last_detected = {}  # Dictionary to track recently detected plates
-        self.parent_window = None  # Will be set by MainWindow for GUI dialog use
+        # Detection parameters
+        self.conf_threshold = conf_threshold
+        self.cooldown = cooldown
+
+        # Dictionaries for controlling duplicate detections
+        self.last_detected = {}      # Keeps track of last detection times
+        self.plate_buffer = {}       # Stores recent appearances of plates for confirmation
+
+        # Reference to the main window, needed for user dialogs
+        self.parent_window = None
 
     def set_parent_window(self, window):
-        #Set the parent GUI window for showing input dialogs and warnings.
+        # Assign the main window to show dialogs
         self.parent_window = window
 
     def _should_save_plate(self, plate_text):
-        #Prevent saving duplicate plates within a cooldown period.
         now = time.time()
-        if plate_text in self.last_detected and now - self.last_detected[plate_text] < self.cooldown:
+
+        # Filter out short or invalid plate texts
+        if not (5 <= len(plate_text) <= 9):
             return False
-        self.last_detected[plate_text] = now
-        return True
+
+        # Store current detection time for this plate
+        if plate_text not in self.plate_buffer:
+            self.plate_buffer[plate_text] = []
+
+        self.plate_buffer[plate_text].append(now)
+
+        # Keep only detections within the last 5 seconds
+        recent_times = [t for t in self.plate_buffer[plate_text] if now - t < 5]
+        self.plate_buffer[plate_text] = recent_times
+
+        # Save plate only if it appeared at least 3 times in the last 5 seconds
+        if len(recent_times) >= 3 and (plate_text not in self.last_detected or now - self.last_detected[plate_text] > self.cooldown):
+            self.last_detected[plate_text] = now
+            return True
+
+        return False
 
     def detect_plate(self, image):
-        #Main detection function: detects plates, reads characters, queries DB, returns list of plate info.
-        plates = []  # List to store detected plates and their info
+        plates = []
 
         try:
-            #  1: Detect license plates using YOLO with the confidence threshold
+            # Run plate detection
             plate_results = self.plate_model(image, conf=self.conf_threshold)
 
-            #  2: Detect vehicles in the whole image if vehicle detector is available
-            vehicle_info = []
-            if self.vehicle_detector:
-                vehicle_info = self.vehicle_detector.detect_vehicle(image)
+            # Detect vehicle types if model is available
+            vehicle_info = self.vehicle_detector.detect_vehicle(image) if self.vehicle_detector else []
 
-            # 3: Process each detection result
             for result in plate_results:
                 for box in result.boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box for plate
-                    conf = float(box.conf[0])  # Confidence of the detection
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    conf = float(box.conf[0])
 
-                    # Crop the license plate from the image
+                    # Crop the detected plate region
                     plate_roi = image[y1:y2, x1:x2]
 
-                    #  4: Perform character recognition
+                    # Perform character recognition
                     text = ""
                     if self.char_detector:
                         text = self.char_detector.detect_characters(plate_roi)
                         if not text:
-                            continue  # Skip if no characters detected
+                            continue  # Skip if no characters are detected
 
-                    # Check for duplicate detection and decide whether to save
+                    # Confirm whether to save the detection
                     if text and self._should_save_plate(text):
-                        #  5: Match the detected plate to a vehicle type
+                        # Try to match with a detected vehicle
                         vehicle_type = self._match_vehicle_type((x1, y1, x2, y2), vehicle_info)
 
-                        #  6: Get owner info from database
+                        # Try to fetch owner info from database
                         owner, vehicle_type_db = self.db.get_owner(text)
 
-                        #  7: If not in DB, ask user for owner name
+                        # If not found, ask the user to input it
                         if owner is None and self.parent_window:
                             owner, ok = QInputDialog.getText(
                                 self.parent_window,
@@ -93,14 +111,14 @@ class CarPlateDetector:
                             else:
                                 owner = "Unknown"
 
-                        # Add result to the list
+                        # Append detected plate information
                         plates.append({
-                            'bbox': (x1, y1, x2, y2),  # Bounding box
-                            'confidence': conf,  # Detection confidence
-                            'text': text,  # Detected license plate text
-                            'roi': plate_roi,  # Plate image region
-                            'owner': owner or "Unknown",  # Owner name
-                            'vehicle': vehicle_type or "Unknown"  # Vehicle type
+                            'bbox': (x1, y1, x2, y2),
+                            'confidence': conf,
+                            'text': text,
+                            'roi': plate_roi,
+                            'owner': owner or "Unknown",
+                            'vehicle': vehicle_type or "Unknown"
                         })
 
         except Exception as e:
@@ -108,29 +126,23 @@ class CarPlateDetector:
             if self.parent_window:
                 QMessageBox.warning(self.parent_window, "Detection Error", f"An error occurred: {str(e)}")
 
-        return plates  # Return list of plate dictionaries
+        return plates
 
     def _match_vehicle_type(self, plate_bbox, vehicle_info):
-
         if not vehicle_info:
             return "Unknown"
 
         px1, py1, px2, py2 = plate_bbox
-        plate_center = ((px1 + px2) // 2, (py1 + py2) // 2)  # Center point of the plate
+        plate_center = ((px1 + px2) // 2, (py1 + py2) // 2)
 
         best_match = None
         best_area = 0
 
+        # Find the vehicle whose bounding box contains the plate center
         for vehicle in vehicle_info:
             vx1, vy1, vx2, vy2 = vehicle['bbox']
-
-            # Check if plate center lies within vehicle bounding box
-            if (vx1 <= plate_center[0] <= vx2 and
-                    vy1 <= plate_center[1] <= vy2):
-
-                # Calculate area to choose the largest matching vehicle
+            if (vx1 <= plate_center[0] <= vx2 and vy1 <= plate_center[1] <= vy2):
                 area = (vx2 - vx1) * (vy2 - vy1)
-
                 if area > best_area:
                     best_area = area
                     best_match = vehicle['label']
