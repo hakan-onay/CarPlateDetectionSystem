@@ -1,11 +1,16 @@
-import sqlite3
 import sys
 import cv2
+import sqlite3
+import qrcode
+from pyzbar.pyzbar import decode
+import webbrowser
+from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QStackedWidget, QLineEdit, QTextEdit, QFileDialog,
-                             QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog)
+                             QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog, QDialog)
 from PyQt5.QtGui import QPixmap, QImage, QIcon, QColor, QDoubleValidator, QIntValidator
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QUrl
+from PyQt5.QtGui import QDesktopServices
 from CarPlateDetector import CarPlateDetector
 from DatabaseManager import DatabaseManager
 
@@ -48,7 +53,7 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.update_frame)
 
     def create_navigation(self):
-        #Create the navigation sidebar
+        """Create the navigation sidebar"""
         self.navigation = QWidget()
         self.navigation.setStyleSheet("""
             background-color: #2c3e50;
@@ -114,7 +119,7 @@ class MainWindow(QMainWindow):
         self.navigation.setLayout(layout)
 
     def create_pages(self):
-        #Create all application pages
+        """Create all application pages"""
         self.stacked_widget = QStackedWidget()
 
         # Page 0: Real-time Detection
@@ -138,7 +143,7 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.page_settings)
 
     def create_detection_page(self):
-        #Create real-time detection page
+        """Create real-time detection page"""
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -181,7 +186,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_image_page(self):
-        #Create image detection page
+        """Create image detection page"""
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -221,7 +226,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_video_page(self):
-        #Create video detection page
+        """Create video detection page"""
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -267,7 +272,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_database_page(self):
-        #Create database management page
+        """Create database management page with QR code functionality"""
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -316,9 +321,20 @@ class MainWindow(QMainWindow):
         self.btn_remove.setStyleSheet("padding: 8px; font-size: 14px;")
         self.btn_remove.clicked.connect(self.remove_plate)
 
+        # QR Code buttons
+        self.btn_generate_qr = QPushButton("Generate QR")
+        self.btn_generate_qr.setStyleSheet("padding: 8px; font-size: 14px;")
+        self.btn_generate_qr.clicked.connect(self.generate_qr_code)
+
+        self.btn_scan_qr = QPushButton("Scan QR")
+        self.btn_scan_qr.setStyleSheet("padding: 8px; font-size: 14px;")
+        self.btn_scan_qr.clicked.connect(self.scan_qr_code)
+
         btn_layout.addWidget(self.btn_refresh)
         btn_layout.addWidget(self.btn_add)
         btn_layout.addWidget(self.btn_remove)
+        btn_layout.addWidget(self.btn_generate_qr)
+        btn_layout.addWidget(self.btn_scan_qr)
         layout.addLayout(btn_layout)
 
         # Load initial data
@@ -328,7 +344,7 @@ class MainWindow(QMainWindow):
         return page
 
     def create_settings_page(self):
-        #Create settings page
+        """Create settings page"""
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -381,7 +397,7 @@ class MainWindow(QMainWindow):
         return page
 
     def switch_page(self, index):
-        #Switch between pages
+        """Switch between pages"""
         self.stacked_widget.setCurrentIndex(index)
 
         # Reset navigation buttons
@@ -400,25 +416,13 @@ class MainWindow(QMainWindow):
             """)
 
         # Highlight current button
-        if index == 0:
-            self.btn_detection.setStyleSheet(
-                "background-color: #2980b9; color: white; border: none; padding: 15px; text-align: left;")
-        elif index == 1:
-            self.btn_image.setStyleSheet(
-                "background-color: #2980b9; color: white; border: none; padding: 15px; text-align: left;")
-        elif index == 2:
-            self.btn_video.setStyleSheet(
-                "background-color: #2980b9; color: white; border: none; padding: 15px; text-align: left;")
-        elif index == 3:
-            self.btn_database.setStyleSheet(
-                "background-color: #2980b9; color: white; border: none; padding: 15px; text-align: left;")
-        elif index == 4:
-            self.btn_settings.setStyleSheet(
-                "background-color: #2980b9; color: white; border: none; padding: 15px; text-align: left;")
+        current_btn = [self.btn_detection, self.btn_image, self.btn_video, self.btn_database, self.btn_settings][index]
+        current_btn.setStyleSheet(
+            "background-color: #2980b9; color: white; border: none; padding: 15px; text-align: left;")
 
     # Camera functions
     def start_camera(self):
-        #Start camera for real-time detection
+        """Start camera for real-time detection"""
         if not self.detector:
             self.initialize_detector()
 
@@ -432,7 +436,7 @@ class MainWindow(QMainWindow):
         self.timer.start(30)  # Update every 30ms
 
     def stop_camera(self):
-        #Stop camera
+        """Stop camera"""
         self.timer.stop()
         if self.cap:
             self.cap.release()
@@ -443,11 +447,10 @@ class MainWindow(QMainWindow):
         self.video_label.clear()
 
     def update_frame(self):
-        #Update camera or video frame with detection results
+        """Update camera or video frame with detection results"""
         try:
             ret, frame = self.cap.read()
             if not ret:
-                # if video ends
                 if hasattr(self, 'current_video_path'):
                     self.stop_video()
                 return
@@ -462,7 +465,6 @@ class MainWindow(QMainWindow):
                 x1, y1, x2, y2 = plate['bbox']
                 cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-                # Format confidence as percentage
                 confidence_percent = plate['confidence'] * 100
                 text = f"{plate['text']} ({plate['vehicle']}) - {confidence_percent:.1f}%"
                 cv2.putText(rgb_image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
@@ -470,23 +472,21 @@ class MainWindow(QMainWindow):
                 # Update results display
                 result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n"
 
-                # write results according to mode
-                if hasattr(self, 'current_video_path'):  # Video
+                if hasattr(self, 'current_video_path'):  # Video mode
                     self.video_results.append(result_text)
-                else:  # Real-time
+                else:  # Real-time mode
                     self.detection_results.append(result_text)
 
-            # Display the frame in the correct label
+            # Display the frame
             h, w, ch = rgb_image.shape
             bytes_per_line = ch * w
             qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
             pixmap = QPixmap.fromImage(qt_image)
 
-            # Show different QLabel depending on which mode we are in
-            if hasattr(self, 'current_video_path'):  # Video mod
+            if hasattr(self, 'current_video_path'):  # Video mode
                 self.video_file_label.setPixmap(
                     pixmap.scaled(self.video_file_label.width(), self.video_file_label.height(), Qt.KeepAspectRatio))
-            else:  # Real-time mod
+            else:  # Real-time mode
                 self.video_label.setPixmap(
                     pixmap.scaled(self.video_label.width(), self.video_label.height(), Qt.KeepAspectRatio))
 
@@ -500,7 +500,7 @@ class MainWindow(QMainWindow):
 
     # Image functions
     def load_image(self):
-
+        """Load an image for plate detection"""
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp)")
         if file_path:
             self.current_image_path = file_path
@@ -510,7 +510,7 @@ class MainWindow(QMainWindow):
             self.btn_detect_image.setEnabled(True)
 
     def detect_image(self):
-        #Detect plates in loaded image
+        """Detect plates in loaded image"""
         if not self.detector:
             self.initialize_detector()
 
@@ -527,7 +527,6 @@ class MainWindow(QMainWindow):
                     x1, y1, x2, y2 = plate['bbox']
                     cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-                    # Format confidence as percentage
                     confidence_percent = plate['confidence'] * 100
                     text = f"{plate['text']} - {confidence_percent:.1f}%"
                     cv2.putText(rgb_image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
@@ -539,7 +538,6 @@ class MainWindow(QMainWindow):
                     # Save to database if not exists
                     owner, existing_vehicle = self.db.get_owner(plate['text'])
                     if owner is None:
-                        # Prompt for owner information
                         owner, ok = QInputDialog.getText(
                             self,
                             "Owner Information",
@@ -551,7 +549,6 @@ class MainWindow(QMainWindow):
                             self.db.insert_plate(plate['text'], owner, plate['vehicle'])
                         else:
                             owner = "Unknown"
-                        # Update the plate info with the new owner
                         plate['owner'] = owner
 
                 # Update displayed image
@@ -564,7 +561,7 @@ class MainWindow(QMainWindow):
 
     # Video functions
     def load_video(self):
-
+        """Load a video file for plate detection"""
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Video", "", "Video Files (*.mp4 *.avi *.mov *.mkv)")
         if file_path:
             self.current_video_path = file_path
@@ -572,15 +569,13 @@ class MainWindow(QMainWindow):
             self.video_file_label.setText(f"Video loaded: {file_path}")
 
     def play_video(self):
-
+        """Play the loaded video with plate detection"""
         if not self.detector:
             self.initialize_detector()
 
-        # if camera works  close
         if self.cap and not hasattr(self, 'current_video_path'):
             self.stop_camera()
 
-        # Check if we already have a video path loaded
         if not hasattr(self, 'current_video_path'):
             QMessageBox.warning(self, "Warning", "Please load a video first!")
             return
@@ -595,22 +590,23 @@ class MainWindow(QMainWindow):
         self.timer.start(30)  # Same as camera update rate
 
     def stop_video(self):
-
+        """Stop video playback"""
         self.timer.stop()
         if self.cap:
             self.cap.release()
             self.cap = None
 
         if hasattr(self, 'current_video_path'):
-            del self.current_video_path  # Exit video mode
+            del self.current_video_path
 
         self.btn_play_video.setEnabled(True)
         self.btn_stop_video.setEnabled(False)
         self.video_file_label.clear()
         self.video_results.clear()
 
+    # Database functions
     def load_database(self):
-
+        """Load all plates from database into the table"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM Plates ORDER BY id DESC")
@@ -623,7 +619,7 @@ class MainWindow(QMainWindow):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(col_data)))
 
     def search_database(self):
-
+        """Search plates in database"""
         search_term = self.search_input.text().strip()
         if not search_term:
             self.load_database()
@@ -643,8 +639,9 @@ class MainWindow(QMainWindow):
         for row_idx, row_data in enumerate(data):
             for col_idx, col_data in enumerate(row_data):
                 self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(col_data)))
+
     def add_plate(self):
-        #Add new plate to database
+        """Add new plate to database"""
         plate, ok1 = QInputDialog.getText(self, "Add Plate", "Enter plate number:")
         if ok1 and plate:
             owner, ok2 = QInputDialog.getText(self, "Add Owner", "Enter owner name:")
@@ -659,7 +656,7 @@ class MainWindow(QMainWindow):
                         QMessageBox.warning(self, "Error", "Plate already exists in database!")
 
     def remove_plate(self):
-        #Remove selected plate from database
+        """Remove selected plate from database"""
         selected_row = self.table.currentRow()
         if selected_row >= 0:
             plate_id = self.table.item(selected_row, 0).text()
@@ -681,9 +678,119 @@ class MainWindow(QMainWindow):
                 self.load_database()
                 QMessageBox.information(self, "Success", "Plate removed successfully!")
 
+    # QR Code functions
+    def generate_qr_code(self):
+        """Generate QR code for selected plate"""
+        selected_row = self.table.currentRow()
+        if selected_row >= 0:
+            # Get plate information
+            plate_id = self.table.item(selected_row, 0).text()
+            plate_number = self.table.item(selected_row, 1).text()
+            owner = self.table.item(selected_row, 2).text()
+            vehicle_type = self.table.item(selected_row, 3).text()
+            date_time = self.table.item(selected_row, 4).text()
+
+            # Create data string
+            data = f"Plate: {plate_number}\nOwner: {owner}\nVehicle: {vehicle_type}\nDate: {date_time}"
+
+            # Generate QR code
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(data)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+
+            # Save QR code
+            file_path, _ = QFileDialog.getSaveFileName(self, "Save QR Code", f"{plate_number}.png", "PNG Files (*.png)")
+            if file_path:
+                img.save(file_path)
+                QMessageBox.information(self, "Success", f"QR code saved as {file_path}")
+        else:
+            QMessageBox.warning(self, "Warning", "Please select a plate from the table first!")
+
+    def scan_qr_code(self):
+        """Scan QR code from image file"""
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Image with QR Code", "",
+                                                   "Image Files (*.png *.jpg *.jpeg *.bmp)")
+
+        if file_path:
+            try:
+                # Read the image and decode QR code
+                image = cv2.imread(file_path)
+                decoded_objects = decode(image)
+
+                if decoded_objects:
+                    # Get the first QR code data
+                    qr_data = decoded_objects[0].data.decode("utf-8")
+
+                    # Create a dialog to display the QR code information
+                    dialog = QDialog(self)
+                    dialog.setWindowTitle("QR Code Information")
+                    dialog.setMinimumSize(400, 300)
+
+                    layout = QVBoxLayout()
+
+                    # Add title
+                    title = QLabel("Vehicle Information from QR Code")
+                    title.setStyleSheet("font-size: 16px; font-weight: bold;")
+                    layout.addWidget(title)
+
+                    # Add QR code data
+                    text_edit = QTextEdit()
+                    text_edit.setPlainText(qr_data)
+                    text_edit.setReadOnly(True)
+                    layout.addWidget(text_edit)
+
+                    # Add close button
+                    btn_close = QPushButton("Close")
+                    btn_close.clicked.connect(dialog.close)
+                    layout.addWidget(btn_close)
+
+                    dialog.setLayout(layout)
+                    dialog.exec_()
+                else:
+                    QMessageBox.warning(self, "Warning", "No QR code found in the selected image!")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to read QR code: {str(e)}")
+
+    def generate_shareable_link(self):
+        """Generate a shareable HTML page with vehicle info"""
+        selected_row = self.table.currentRow()
+        if selected_row >= 0:
+            plate_number = self.table.item(selected_row, 1).text()
+
+            html_content = f"""
+            <html>
+            <head>
+                <title>Vehicle Info: {plate_number}</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body>
+                <h1>Vehicle Information</h1>
+                <p>Scan the QR code below with the mobile app:</p>
+                <p>Plate: {plate_number}</p>
+                <p>More info would be displayed here...</p>
+            </body>
+            </html>
+            """
+
+            file_path, _ = QFileDialog.getSaveFileName(self, "Save Shareable Link", f"{plate_number}.html",
+                                                       "HTML Files (*.html)")
+            if file_path:
+                with open(file_path, 'w') as f:
+                    f.write(html_content)
+
+                # Open in default browser
+                webbrowser.open(f"file://{file_path}")
+                QMessageBox.information(self, "Success", f"Shareable link saved as {file_path}")
+
     # Settings functions
     def save_settings(self):
-
+        """Save application settings"""
         self.plate_model_path = self.plate_path_edit.text()
         self.char_model_path = self.char_path_edit.text()
         self.vehicle_model_path = self.vehicle_path_edit.text()
@@ -718,7 +825,7 @@ class MainWindow(QMainWindow):
         self.settings_status.setStyleSheet("color: green;")
 
     def initialize_detector(self):
-        #Initialize the plate detector with current settings
+        """Initialize the plate detector with current settings"""
         try:
             self.detector = CarPlateDetector(
                 plate_model_path=self.plate_model_path,
@@ -734,7 +841,7 @@ class MainWindow(QMainWindow):
             self.detector = None
 
     def closeEvent(self, event):
-
+        """Handle application close event"""
         self.stop_camera()
         self.stop_video()
         event.accept()
