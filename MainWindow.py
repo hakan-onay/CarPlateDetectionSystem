@@ -689,15 +689,13 @@ class MainWindow(QMainWindow):
         # Generate QR code for selected plate
         selected_row = self.table.currentRow()
         if selected_row >= 0:
-            # Get plate information
-            plate_id = self.table.item(selected_row, 0).text()
+            # Get plate information (excluding date_time)
             plate_number = self.table.item(selected_row, 1).text()
             owner = self.table.item(selected_row, 2).text()
             vehicle_type = self.table.item(selected_row, 3).text()
-            date_time = self.table.item(selected_row, 4).text()
 
-            # Create data string
-            data = f"Plate: {plate_number}\nOwner: {owner}\nVehicle: {vehicle_type}\nDate: {date_time}"
+            # Create data string (without date)
+            data = f"Plate: {plate_number}\nOwner: {owner}\nVehicle: {vehicle_type}"
 
             # Generate QR code
             qr = qrcode.QRCode(
@@ -735,8 +733,8 @@ class MainWindow(QMainWindow):
 
                     # Create a dialog to display the QR code information
                     dialog = QDialog(self)
-                    dialog.setWindowTitle("QR Code Information")
-                    dialog.setMinimumSize(400, 300)
+                    dialog.setWindowTitle("Vehicle Information")
+                    dialog.setMinimumSize(400, 200)  # Smaller size since we have less info
 
                     layout = QVBoxLayout()
 
