@@ -1,158 +1,133 @@
 
-# 🚘 License Plate Recognition System (LPR)
+# 🚗 Car Plate Recognition System
 
-A real-time, multi-functional License Plate Recognition system powered by YOLOv8, OpenCV, and PyQt5. This system can detect, segment, and recognize license plates from images, videos, or live camera feeds with integrated database and user-friendly GUI.
-
----
-
-## 🌟 Key Features
-
-- 📸 **Real-Time Detection** via camera feed  
-- 🖼️ **Offline Recognition** from images and videos  
-- 🧠 **Multi-Stage Detection Pipeline**:
-  - License plate localization
-  - Character segmentation & OCR
-  - Vehicle type classification (car, truck, bus)
-- 🗃️ **SQLite Integration** for storage and search
-- 🖥️ **GUI Interface** built with PyQt5
-- ⚙️ **Configurable Settings**: detection thresholds, cooldown time, etc.
+This is an advanced License Plate Recognition (LPR) system powered by YOLOv8 and PyQt5. It can detect vehicle license plates in real-time from camera feed, static images, and video files. It also supports character recognition, vehicle type classification, and integrates with a local SQLite database. Additionally, the system can generate and scan QR codes for plate records.
 
 ---
 
-## 🛠 Tech Stack
+## 🌟 Features
 
-### Core Technologies
+- **Real-Time Detection**: Detect and recognize license plates using your webcam.
+- **Image & Video Detection**: Analyze uploaded images or video files for plate recognition.
+- **Plate Character Recognition**: Use a trained YOLO model to segment and recognize plate characters.
+- **Vehicle Classification**: Distinguish between different vehicle types (e.g., car, truck, bus).
+- **SQLite Database**: Automatically log detected plates, owners, vehicle types, and timestamps.
+- **GUI with PyQt5**: Intuitive interface to interact with the system.
+- **QR Code Integration**: Generate and scan QR codes for any plate entry.
+- **CSV Export**: Export all plate logs as a CSV file.
+
+---
+
+## 🧠 Technologies Used
+
 - **Python 3.8+**
-- **YOLOv8** – Custom-trained models for detection and classification
-- **OpenCV** – Image and video processing
-- **PyQt5** – GUI development
-- **SQLite** – Lightweight embedded database
-
-### Models Used
-- 🔳 **Plate Detection** - YOLOv8
-- 🔡 **Character Recognition** - YOLOv8 OCR
-- 🚚 **Vehicle Classification** - YOLOv8
+- **YOLOv8 (Ultralytics)** - Object detection
+- **OpenCV** - Image processing
+- **PyQt5** - GUI framework
+- **SQLite3** - Lightweight database
+- **pandas** - Data manipulation and CSV export
+- **qrcode & pyzbar** - QR code generation and decoding
 
 ---
 
-## 🚀 Installation Guide
+## 📦 Folder Structure
 
-### Prerequisites
-- Python 3.8+
-- NVIDIA GPU (CUDA supported) recommended
+```
+project/
+├── main.py
+├── CarPlateDetector.py
+├── PlateCharacterDetector.py
+├── VehicleTypeDetector.py
+├── DatabaseManager.py
+├── models/
+│   ├── PlateModel/weights/best.pt
+│   ├── CharModel/weights/best.pt
+│   └── VehicleModel/weights/best.pt
+├── LPR.db
+└── assets/ (optional images, videos, QR codes)
+```
 
-### Setup
+---
+
+## 🚀 Setup Instructions
+
+### 1. Clone the Repository
 
 ```bash
-# Clone the repository
-git clone https://github.com/hakan-onay/license-plate-recognition.git
-cd license-plate-recognition
+git clone https://github.com/hakan-onay/CarPlateDetectionSystem.git
+cd CarPlateDetectionSystem
+```
 
-# Create virtual environment
+### 2. Install Requirements
+
+Create a virtual environment (optional but recommended):
+
+```bash
 python -m venv venv
-# Activate (Windows)
-.env\Scriptsctivate
-# or Activate (Linux/Mac)
-source venv/bin/activate
+venv\Scripts\activate  # On Windows
+source venv/bin/activate  # On Unix or Mac
+```
 
-# Install dependencies
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-### Model Weights
-Place your trained weights in the following structure:
-
-```
-models/
-├── CharModel/weights/best.pt
-├── PlateModel/weights/best.pt
-└── VehicleModel/weights/best.pt
-```
-
----
-
-## 💻 Usage
-
-### Launch the Application
+### 3. Run the Application
 
 ```bash
 python main.py
 ```
 
-### Application Modes
+---
 
-#### 🎥 Real-Time Detection
-- Use your camera for live recognition
-- Automatically identifies and logs license plates
-- Optional vehicle classification
+## 🧪 Model Requirements
 
-#### 🖼 Image Processing
-- Load and process images
-- Recognize and store detected plates
+Ensure you have trained YOLOv8 models for:
+- **License Plate Detection**
+- **Character Recognition**
+- **Vehicle Type Detection**
 
-#### 📼 Video Processing
-- Frame-by-frame plate recognition
-- Visual output with annotated results
-
-#### 📋 Database Management
-- View, add, edit, and delete records
-- Full search functionality for detected plates
-
-#### ⚙️ System Settings
-- Modify model paths
-- Set detection confidence thresholds
-- Define cooldown period between detections
+Place them inside the `models/` folder in the appropriate subdirectories.
 
 ---
 
-## 🏗 System Architecture
+## 📊 Example Plate Record (Database)
 
-```
-[Camera/Input] --> [YOLOv8 Detection] --> [Character Segmentation & OCR]
-                                      ↘︎
-                          [Vehicle Type Classifier]
-                                      ↘︎
-                           [Database & GUI Display]
-```
+| Plate     | Owner       | Vehicle Type | Date Time           |
+|-----------|-------------|--------------|---------------------|
+| 34ABC123  | Hakan Onay  |     Car      | 2025-06-28 14:32:45 |
 
 ---
 
-## 📂 File Structure
+## 📸 Sample Use Cases
 
-```
-LPR-System/
-├── main.py                   # Entry point for GUI
-├── CarPlateDetector.py       # Plate detection pipeline
-├── PlateCharacterDetector.py # OCR for plate text
-├── VehicleTypeDetector.py    # Classify vehicle type
-├── DatabaseManager.py        # Database handling (CRUD)
-├── models/                   # YOLOv8 model weights
-├── LPR.db                    # SQLite DB file
-├── requirements.txt          # Project dependencies
-└── README.md                 # Project documentation
-```
+- Automatic gate entry systems
+- Parking management
+- Campus or company vehicle tracking
+- Traffic law enforcement systems
 
 ---
 
-## 🤝 Contributing
+## 🔒 Notes
 
-We welcome contributions!
-
-1. Fork the repo  
-2. Create a new branch (`git checkout -b feature/AmazingFeature`)  
-3. Commit your changes (`git commit -m 'Add AmazingFeature'`)  
-4. Push to the branch (`git push origin feature/AmazingFeature`)  
-5. Open a Pull Request  
+- Accuracy of recognition depends on model quality and image clarity.
+- QR code generation only encodes plate, owner, and vehicle type.
 
 ---
 
+## 🧠 Future Enhancements
 
-## ✨ Acknowledgements
+- Export results as PDF
+- Multi-language support
+- REST API for cloud sync
+- Plate format validation based on country rules
+
+---
+
+## 🙋‍♂️ Acknowledgments
 
 - [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics)
+- [PyQt5](https://pypi.org/project/PyQt5/)
 - [OpenCV](https://opencv.org/)
-- [PyQt5](https://riverbankcomputing.com/software/pyqt)
-
----
-
-> Made with ❤️ for learning, research, and practical application in vehicle license plate recognition.

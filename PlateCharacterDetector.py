@@ -32,7 +32,7 @@ class PlateCharacterDetector:
         # Remove any non-alphanumeric characters
         plate_text = ''.join(c for c in plate_text if c.isalnum())
 
-         #For the Turkish Plate
+        # For the Turkish Plate
         if len(plate_text) > 1 and plate_text[0].isalpha() and plate_text[1].isdigit():
             plate_text = plate_text[1:]
 
