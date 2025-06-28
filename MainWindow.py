@@ -326,6 +326,7 @@ class MainWindow(QMainWindow):
         self.btn_export_csv.setStyleSheet("padding: 8px; font-size: 14px;")
         self.btn_export_csv.clicked.connect(self.export_to_csv)
 
+
         self.btn_generate_qr = QPushButton("Generate QR")
         self.btn_generate_qr.setStyleSheet("padding: 8px; font-size: 14px;")
         self.btn_generate_qr.clicked.connect(self.generate_qr_code)
@@ -430,7 +431,6 @@ class MainWindow(QMainWindow):
         # Start camera for real-time detection
         if not self.detector:
             self.initialize_detector()
-            self.detector.set_real_time_mode(True)
 
         self.cap = cv2.VideoCapture(0)
         if not self.cap.isOpened():
@@ -451,10 +451,8 @@ class MainWindow(QMainWindow):
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.video_label.clear()
-        self.detection_results.clear()
 
     def update_frame(self):
-        # Update camera or video frame with detection results
         try:
             ret, frame = self.cap.read()
             if not ret:
@@ -477,7 +475,7 @@ class MainWindow(QMainWindow):
                 cv2.putText(rgb_image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
                 # Update results display
-                result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n"
+                result_text = (f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle Type: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n")
 
                 if hasattr(self, 'current_video_path'):  # Video mode
                     self.video_results.append(result_text)
@@ -520,7 +518,6 @@ class MainWindow(QMainWindow):
         # Detect plates in loaded image
         if not self.detector:
             self.initialize_detector()
-            self.detector.set_real_time_mode(False)
 
         if hasattr(self, 'current_image_path'):
             image = cv2.imread(self.current_image_path)
@@ -540,14 +537,38 @@ class MainWindow(QMainWindow):
                     cv2.putText(rgb_image, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
                     # Update results
-                    result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n"
+                    result_text = f"Plate: {plate['text']}\nOwner: {plate['owner']}\nVehicle Type: {plate['vehicle']}\nConfidence: {confidence_percent:.1f}%\n\n"
                     self.image_results.insertPlainText(result_text)
+
+                    # If plate is not in the database, ask for owner information
+                    if plate['owner'] == "Not in database":
+                        owner, ok = QInputDialog.getText(
+                            self,
+                            "Owner Information",
+                            f"Plate '{plate['text']}' not found in database.\nPlease enter owner name:",
+                            QLineEdit.Normal,
+                            ""
+                        )
+                        if ok and owner:
+                            try:
+                                self.db.insert_plate(plate['text'], owner, plate['vehicle'])
+                                # Update information
+                                plate['owner'] = owner
+                                # Refresh results
+                                self.image_results.clear()
+                                for p in plates:
+                                    self.image_results.insertPlainText(
+                                        f"Plate: {p['text']}\nOwner: {p['owner']}\nVehicle Type: {p['vehicle']}\nConfidence: {p['confidence'] * 100:.1f}%\n\n"
+                                    )
+                            except Exception as e:
+                                QMessageBox.warning(self, "Error", f"Failed to save to database: {str(e)}")
 
                 # Update displayed image
                 h, w, ch = rgb_image.shape
                 bytes_per_line = ch * w
                 qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
                 pixmap = QPixmap.fromImage(qt_image)
+                self.image_results.ensureCursorVisible()  # Scroll to the bottom
                 self.image_label.setPixmap(
                     pixmap.scaled(self.image_label.width(), self.image_label.height(), Qt.KeepAspectRatio))
 
@@ -564,7 +585,6 @@ class MainWindow(QMainWindow):
         # Play the loaded video with plate detection
         if not self.detector:
             self.initialize_detector()
-            self.detector.set_real_time_mode(True)
 
         if self.cap and not hasattr(self, 'current_video_path'):
             self.stop_camera()
@@ -747,6 +767,37 @@ class MainWindow(QMainWindow):
                     QMessageBox.warning(self, "Warning", "No QR code found in the selected image!")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to read QR code: {str(e)}")
+
+    def generate_shareable_link(self):
+        # Generate a shareable HTML page with vehicle info
+        selected_row = self.table.currentRow()
+        if selected_row >= 0:
+            plate_number = self.table.item(selected_row, 1).text()
+
+            html_content = f"""
+            <html>
+            <head>
+                <title>Vehicle Info: {plate_number}</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body>
+                <h1>Vehicle Information</h1>
+                <p>Scan the QR code below with the mobile app:</p>
+                <p>Plate: {plate_number}</p>
+                <p>More info would be displayed here...</p>
+            </body>
+            </html>
+            """
+
+            file_path, _ = QFileDialog.getSaveFileName(self, "Save Shareable Link", f"{plate_number}.html",
+                                                       "HTML Files (*.html)")
+            if file_path:
+                with open(file_path, 'w') as f:
+                    f.write(html_content)
+
+                # Open in default browser
+                webbrowser.open(f"file://{file_path}")
+                QMessageBox.information(self, "Success", f"Shareable link saved as {file_path}")
 
     def export_to_csv(self):
         try:

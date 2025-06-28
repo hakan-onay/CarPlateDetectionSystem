@@ -3,70 +3,71 @@ from datetime import datetime
 
 
 class DatabaseManager:
-    def __init__(self, db_path="LPR.db"):
-        self.db_path = db_path
-        self._initialize_db()
+    def __init__(self, db_name="LPR.db"):
+        self.db_name = db_name
+        self._create_table()
 
-    def _initialize_db(self):
-        # Initialize the database with required tables.
-        conn = sqlite3.connect(self.db_path)
+    def _connect(self):
+        return sqlite3.connect(self.db_name)
+
+    def _create_table(self):
+        # Create table if not exists
+        conn = self._connect()
         cursor = conn.cursor()
-
-        # Create Plates table if not exists
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS Plates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                plate TEXT UNIQUE NOT NULL,
+                plate TEXT UNIQUE,
                 owner TEXT,
                 vehicle_type TEXT,
                 date_time TEXT
             )
         """)
-
         conn.commit()
         conn.close()
 
-    def insert_plate(self, plate, owner="Unknown", vehicle_type="Unknown"):
-        # Insert a new plate into the database.
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+    def insert_plate(self, plate_text, owner, vehicle_type=None):
 
         try:
-            cursor.execute("""
-                INSERT INTO Plates (plate, owner, vehicle_type, date_time)
-                VALUES (?, ?, ?, ?)
-            """, (plate, owner, vehicle_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            conn = self._connect()
+            cursor = conn.cursor()
+            date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # Check if plate already exists
+            cursor.execute("SELECT 1 FROM Plates WHERE plate = ?", (plate_text,))
+            if cursor.fetchone():
+                # Update existing record
+                cursor.execute("""
+                    UPDATE Plates 
+                    SET owner = ?, vehicle_type = ?, date_time = ?
+                    WHERE plate = ?
+                """, (owner, vehicle_type, date, plate_text))
+            else:
+                # Insert new record
+                cursor.execute("""
+                    INSERT INTO Plates (plate, owner, vehicle_type, date_time) 
+                    VALUES (?, ?, ?, ?)
+                """, (plate_text, owner, vehicle_type, date))
 
             conn.commit()
-            return True
-        except sqlite3.IntegrityError:
-            return False
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            raise
         finally:
             conn.close()
 
-    def get_owner(self, plate):
-        # Get owner and vehicle type for a given plate.
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+    def get_owner(self, plate_text):
 
-        cursor.execute("""
-            SELECT owner, vehicle_type FROM Plates WHERE plate = ?
-        """, (plate,))
-
-        result = cursor.fetchone()
-        conn.close()
-
-        if result:
-            return result[0], result[1]
-        return None, None
-
-    def get_all_plates(self):
-        # Get all plates from the database.
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT * FROM Plates ORDER BY id DESC")
-        plates = cursor.fetchall()
-
-        conn.close()
-        return plates
+        try:
+            conn = self._connect()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT owner, vehicle_type FROM Plates WHERE plate = ?
+            """, (plate_text,))
+            result = cursor.fetchone()
+            return result if result else (None, None)
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return (None, None)
+        finally:
+            conn.close()

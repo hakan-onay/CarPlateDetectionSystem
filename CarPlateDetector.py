@@ -24,57 +24,22 @@ class CarPlateDetector:
         self.conf_threshold = conf_threshold  # Minimum confidence
         self.cooldown = cooldown  # Time limit to avoid duplicate entries
         self.last_detected = {}  # Dictionary to track recently detected plates
-        self.detection_counts = {}  # Track how many times each plate was detected
         self.parent_window = None  # Will be set by MainWindow for GUI dialog use
-        self.is_real_time = False  # Flag to distinguish between real-time and image modes
 
     def set_parent_window(self, window):
-        # Set the parent GUI window for showing input dialogs and warnings.
+        #Set the parent GUI window for showing input dialogs and warnings.
         self.parent_window = window
 
-    def set_real_time_mode(self, is_real_time):
-        # Set whether we're in real-time/video mode or image mode.
-        self.is_real_time = is_real_time
-        if not is_real_time:
-            self.detection_counts.clear()  # Clear counts when switching to image mode
-
     def _should_save_plate(self, plate_text):
-        # Determine whether to save/process a plate based on detection mode and count.
+        #Prevent saving duplicate plates within a cooldown period.
         now = time.time()
-
-        # Image mode (single processing)
-        if not self.is_real_time:
-            # If we've already seen this plate in current session, don't process again
-            if plate_text in self.detection_counts:
-                return False
-            self.detection_counts[plate_text] = 1
-            return True
-
-        # Real-time/video mode
-        if plate_text in self.last_detected:
-            # Check if within cooldown period
-            if now - self.last_detected[plate_text] < self.cooldown:
-                return False
-
-            # Increment detection count
-            self.detection_counts[plate_text] = self.detection_counts.get(plate_text, 0) + 1
-
-            # Only process after 3 detections
-            if self.detection_counts[plate_text] >= 5:
-                self.detection_counts[plate_text] = 0  # Reset counter
-                self.last_detected[plate_text] = now
-                return True
+        if plate_text in self.last_detected and now - self.last_detected[plate_text] < self.cooldown:
             return False
-
-        # First time seeing this plate
-        self.detection_counts[plate_text] = 1
         self.last_detected[plate_text] = now
-        return False
+        return True
 
     def detect_plate(self, image):
-        # Main detection function: detects plates, reads characters, queries DB, returns list of plate info.
         plates = []  # List to store detected plates and their info
-
         try:
             # 1: Detect license plates using YOLO with the confidence threshold
             plate_results = self.plate_model(image, conf=self.conf_threshold)
@@ -108,43 +73,36 @@ class CarPlateDetector:
                         # 6: Get owner info from database
                         owner, vehicle_type_db = self.db.get_owner(text)
 
-                        # 7: If not in DB, ask user for owner name
-                        if owner is None and self.parent_window:
-                            owner, ok = QInputDialog.getText(
-                                self.parent_window,
-                                "Owner Information",
-                                f"Owner for plate '{text}' not found. Enter owner name:",
-                                QLineEdit.Normal,
-                                ""
-                            )
-                            if ok and owner:
-                                try:
-                                    self.db.insert_plate(text, owner, vehicle_type)
-                                except Exception as e:
-                                    print(f"Database error: {e}")
-                                    owner = "Unknown"
-                            else:
-                                owner = "Unknown"
+                        # If vehicle type from DB is available, use it
+                        if vehicle_type_db:
+                            vehicle_type = vehicle_type_db
 
-                        # Add result to the list
-                        plates.append({
-                            'bbox': (x1, y1, x2, y2),  # Bounding box
-                            'confidence': conf,  # Detection confidence
-                            'text': text,  # Detected license plate text
-                            'roi': plate_roi,  # Plate image region
-                            'owner': owner or "Unknown",  # Owner name
-                            'vehicle': vehicle_type or "Unknown"  # Vehicle type
-                        })
+                        # Create plate info dictionary
+                        plate_info = {
+                            'bbox': (x1, y1, x2, y2),
+                            'confidence': conf,
+                            'text': text,
+                            'roi': plate_roi,
+                            'owner': owner or "Not in database",
+                            'vehicle': vehicle_type or "Unknown"
+                        }
+
+                        plates.append(plate_info)
+
+                        # Show alert if plate is found in database
+                        if owner is not None and self.parent_window:
+                            alert_msg = f"Vehicle found!\n\nPlate: {text}\nOwner: {owner}\nVehicle Type: {vehicle_type}"
+                            QMessageBox.information(self.parent_window, "Vehicle Detected", alert_msg)
 
         except Exception as e:
             print(f"Detection error: {e}")
             if self.parent_window:
                 QMessageBox.warning(self.parent_window, "Detection Error", f"An error occurred: {str(e)}")
 
-        return plates  # Return list of plate dictionaries
+        return plates
 
     def _match_vehicle_type(self, plate_bbox, vehicle_info):
-        # Match a detected plate to a vehicle type based on position.
+
         if not vehicle_info:
             return "Unknown"
 
