@@ -34,7 +34,7 @@ This is an advanced License Plate Recognition (LPR) system powered by YOLOv8 and
 
 ```
 project/
-├── main.py
+├── MainWindow.py
 ├── CarPlateDetector.py
 ├── PlateCharacterDetector.py
 ├── VehicleTypeDetector.py
@@ -43,8 +43,8 @@ project/
 │   ├── PlateModel/weights/best.pt
 │   ├── CharModel/weights/best.pt
 │   └── VehicleModel/weights/best.pt
-├── LPR.db
-└── assets/ (optional images, videos, QR codes)
+└── LPR.db
+
 ```
 
 ---
