@@ -711,7 +711,7 @@ class MainWindow(QMainWindow):
                 box_size=10,
                 border=4,
             )
-            qr.add_data(data)
+            qr.add_data(data.encode("utf-8-sig"))
             qr.make(fit=True)
             img = qr.make_image(fill_color="black", back_color="white")
 
@@ -736,7 +736,7 @@ class MainWindow(QMainWindow):
 
                 if decoded_objects:
                     # Get the first QR code data
-                    qr_data = decoded_objects[0].data.decode("utf-8")
+                    qr_data = decoded_objects[0].data.decode("utf-8-sig")
 
                     # Create a dialog to display the QR code information
                     dialog = QDialog(self)
@@ -809,7 +809,7 @@ class MainWindow(QMainWindow):
             # Ask user where to save the file
             file_path, _ = QFileDialog.getSaveFileName(self, "Save as CSV", "plates.csv", "CSV Files (*.csv)")
             if file_path:
-                df.to_csv(file_path, index=False)
+                df.to_csv(file_path, index=False, encoding='utf-8-sig')
                 QMessageBox.information(self, "Success", "Plate data exported to CSV successfully!")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to export data: {str(e)}")
