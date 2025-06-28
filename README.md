@@ -77,7 +77,7 @@ pip install -r requirements.txt
 ### 3. Run the Application
 
 ```bash
-python main.py
+python MainWindow.py
 ```
 
 ---
