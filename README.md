@@ -131,3 +131,9 @@ Place them inside the `models/` folder in the appropriate subdirectories.
 - [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics)
 - [PyQt5](https://pypi.org/project/PyQt5/)
 - [OpenCV](https://opencv.org/)
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
